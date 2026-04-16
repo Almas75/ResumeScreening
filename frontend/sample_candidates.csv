@@ -1,0 +1,11 @@
+Resume_ID,Name,Skills,Experience (Years),Education,Certifications,Job Role,Recruiter Decision,Salary Expectation ($),Projects Count,AI Score (0-100)
+1,John Doe,"Python, Machine Learning, SQL",5,B.Tech,AWS Certified,Data Scientist,Hire,85000,5,85
+2,Jane Smith,"Java, Spring Boot, React",3,MCA,Oracle Certified,Software Engineer,Hire,70000,3,78
+3,Mike Johnson,"JavaScript, Node.js, MongoDB",4,B.Sc,None,Full Stack Developer,Hire,65000,4,82
+4,Sarah Wilson,"Python, Django, PostgreSQL",6,M.Tech,Google Cloud,Backend Developer,Hire,90000,6,90
+5,David Brown,"React, TypeScript, CSS",2,BCA,None,Frontend Developer,Reject,45000,2,65
+6,Emma Davis,"Python, TensorFlow, NLP",8,PhD,Deep Learning Cert,AI Engineer,Hire,110000,8,95
+7,Chris Miller,"C#, .NET, SQL Server",7,B.Tech,Microsoft Certified,.NET Developer,Hire,80000,5,88
+8,Lisa Garcia,"PHP, Laravel, MySQL",4,B.Sc,None,PHP Developer,Reject,55000,3,70
+9,Tom Anderson,"Python, Flask, Docker",5,M.Sc,AWS Certified,DevOps Engineer,Hire,95000,7,92
+10,Amy White,"Java, Hibernate, Oracle",6,B.E,None,Java Developer,Hire,78000,4,84

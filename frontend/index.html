@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RecruitAI — Resume Screening</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="hero">
+  <div class="hero-inner">
+    <span class="hero-tag">✦ AI-POWERED RECRUITMENT</span>
+    <h1>Smart Hiring,<br><span>Simplified</span></h1>
+    <p>Screen hundreds of resumes in seconds using semantic AI matching, five ML classifiers, and automated ATS gap analysis.</p>
+  </div>
+</div>
+
+<div class="tabs-container">
+  <div class="tabs">
+    <button class="tab-button active" onclick="showTab('candidate')">🔍 Candidate Filter</button>
+    <button class="tab-button" onclick="showTab('ats')">📊 ATS Resume Checker</button>
+  </div>
+</div>
+
+<div class="content-wrapper">
+
+    <div id="candidate" class="tab-content active">
+      <div class="section-header">
+        <div class="section-bar"></div>
+        <div class="section-title">Upload Dataset & Find Top Candidates</div>
+      </div>
+      <div class="card">
+          <h3 class="card-title">Resume Dataset</h3>
+          <form id="candidateForm">
+            <div class="file-drop" id="csvDropZone" onclick="document.getElementById('csvFile').click()">
+              <input type="file" id="csvFile" accept=".csv" required>
+              <div style="margin-bottom: 14px; font-weight:600; color:var(--text);">Upload CSV with candidate data</div>
+              <div id="csvFileName" style="margin-bottom: 10px; color:var(--muted); font-size:14px;">Drag and drop a file here or click Browse files</div>
+              <button type="button" class="browse-button" onclick="event.stopPropagation(); document.getElementById('csvFile').click();">Browse files</button>
+              <small style="display:block; margin-top:12px; color:var(--muted);">Limit 200MB per file • CSV</small>
+            </div>
+            <div style="text-align: center; margin: 10px 0;">
+              <a href="sample_candidates.csv" download style="color: #2563d4; text-decoration: none; font-size: 14px;">
+                📥 Download Sample CSV Template
+              </a>
+            </div>
+            <textarea id="jobDesc" placeholder="Paste the job description" class="textarea-lg" required></textarea>
+            <div class="slider-container">
+              <label>Top candidates to show</label>
+              <div class="slider-row">
+                <input type="range" id="numCandidates" min="5" max="50" value="10" class="slider">
+                <span class="slider-value"><span id="sliderValue">10</span></span>
+              </div>
+            </div>
+            <button type="submit" class="btn-primary">✦ Train & Get Candidates</button>
+          </form>
+      </div>
+      <div id="candidateResult" class="result-container"></div>
+    </div>
+
+    <div id="ats" class="tab-content">
+      <div class="section-header">
+        <div class="section-bar" style="background:#2563d4"></div>
+        <div class="section-title">ATS Resume Checker</div>
+      </div>
+      <div class="columns-2">
+        <div class="card">
+          <h3 class="card-title">📄 Upload Resume</h3>
+          <div class="file-drop" id="resumeDropZone" onclick="document.getElementById('resumeFile').click()">
+            <input type="file" id="resumeFile" accept=".pdf,.docx,.txt" style="display:none;">
+            <span id="fileNameDisplay">Drag and drop your resume<br><small>or click to browse</small></span>
+          </div>
+          <div id="fileStatus" class="status-badge" style="display:none;">✓ File detected</div>
+        </div>
+        <div class="card">
+          <h3 class="card-title">📝 Job Description</h3>
+          <textarea id="jobDesc2" placeholder="Paste the job description here..." class="textarea-lg"></textarea>
+          <small><span id="charCount">0</span> characters</small>
+        </div>
+      </div>
+      
+      <div class="status-grid">
+        <div class="status-card"><strong>File:</strong> <span id="statusBox">None</span></div>
+        <div class="status-card"><strong>JD:</strong> <span id="jobDescStatus">Empty</span></div>
+      </div>
+
+      <div style="text-align:center; margin-top:20px;">
+        <button onclick="analyzeResume()" class="btn-primary">✦ Generate Matching Score</button>
+      </div>
+      <div id="atsResult" class="result-container"></div>
+    </div>
+
+
+
+</div>
+
+<footer class="footer">
+  <p>Built with ❤ using Flask • Scikit-learn • Sentence Transformers</p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>ATS Resume Checker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>ATS Resume Checker</h1>
+
+<div style="text-align:center; margin-bottom:20px;">
+  <a href="ats.html" style="display:inline-block; padding:10px 20px; background:#2563d4; color:white; text-decoration:none; border-radius:8px; font-weight:600; box-shadow:0 2px 8px rgba(37,99,212,0.2);">📊 Go to Standalone ATS Checker</a>
+</div>
+
+<div class="card">
+
+<label>Upload Resume</label>
+<input type="file" id="resume">
+
+<label>Job Description</label>
+<textarea id="job_desc" rows="6"
+placeholder="Paste job description here"></textarea>
+
+<button onclick="checkResume()">Predict Score</button>
+
+</div>
+
+<div id="result" class="result"></div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
