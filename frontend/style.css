@@ -426,3 +426,8 @@ li {
     margin-top: 60px;
 }
 
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+

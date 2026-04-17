@@ -30,23 +30,64 @@ try:
 except:
     print("Warning: .pkl files not found. Predict route may fail.")
 
+# List of common English stop words to filter out
+common_words = {"and", "the", "for", "with", "this", "that", "from", "your", "will", "our", "are", "have", "been", "was", "were", "but", "not", "can", "they", "then", "into", "has", "more", "now", "well", "only", "about", "also", "some", "when", "into", "where", "how", "all", "any", "each", "few", "most", "other", "such", "than", "very", "should", "could"}
+
+# A more comprehensive list of technical keywords to help extraction
+TECHNICAL_SKILLS_LIST = [
+    "python", "java", "javascript", "c++", "c#", "ruby", "php", "swift", "kotlin", "go", "rust",
+    "html", "css", "react", "angular", "vue", "node.js", "express", "django", "flask", "spring",
+    "sql", "mysql", "postgresql", "mongodb", "redis", "cassandra", "oracle", "nosql",
+    "aws", "azure", "google cloud", "docker", "kubernetes", "jenkins", "terraform", "ansible",
+    "machine learning", "ml", "deep learning", "neural network", "neural networks", "llm", "llms", 
+    "large language model", "large language models", "nlp", "natural language processing", "computer vision",
+    "data science", "data analysis", "tableau", "power bi", "pandas", "numpy", "scikit-learn", "tensorflow", "pytorch",
+    "git", "github", "gitlab", "bitbucket", "linux", "unix", "bash", "agile", "scrum", "devops",
+    "rest api", "graphql", "microservices", "unit testing", "integration testing", "docker", "kubernetes"
+]
+
+# Map synonyms/acronyms to a single canonical name to avoid duplicates
+TECHNICAL_SYNONYMS = {
+    "ml": "machine learning",
+    "llm": "large language models",
+    "llms": "large language models",
+    "large language model": "large language models",
+    "nlp": "natural language processing",
+    "neural network": "neural networks",
+}
+
 def clean_text(text):
+    """Standard cleaning for ML model prediction (retains original behavior)"""
     text = str(text).lower()
     text = re.sub(r"http\S+", "", text)
     text = re.sub(r"\S+@\S+", "", text)
     text = text.translate(str.maketrans("", "", string.punctuation))
     return re.sub(r"\s+", " ", text)
 
+def clean_technical_text(text):
+    """Cleaning for technical keyword extraction (preserves terms like C++, .NET)"""
+    text = str(text).lower()
+    text = re.sub(r"http\S+", "", text)
+    text = re.sub(r"\S+@\S+", "", text)
+    # Remove only non-technical punctuation
+    text = re.sub(r'[^a-zA-Z0-9\s\+\#\.\-]', ' ', text)
+    return re.sub(r"\s+", " ", text)
+
 def extract_text(file):
-    if file.filename.endswith('.pdf'):
-        with pdfplumber.open(file) as pdf:
-            text = "".join([page.extract_text() or "" for page in pdf.pages])
-            return text
-    elif file.filename.endswith('.docx'):
-        doc = docx.Document(file)
-        return "\n".join([para.text for para in doc.paragraphs])
-    elif file.filename.endswith('.txt'):
-        return file.read().decode('utf-8')
+    try:
+        # Save current position in case it was read before
+        file.seek(0)
+        if file.filename.endswith('.pdf'):
+            with pdfplumber.open(file) as pdf:
+                text = "".join([page.extract_text() or "" for page in pdf.pages])
+                return text
+        elif file.filename.endswith('.docx'):
+            doc = docx.Document(file)
+            return "\n".join([para.text for para in doc.paragraphs])
+        elif file.filename.endswith('.txt'):
+            return file.read().decode('utf-8')
+    except Exception as e:
+        print(f"Error extracting text: {e}")
     return ""
 
 @app.route("/")
@@ -59,26 +100,74 @@ def static_files(path):
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    data = request.json
-    text = f"{data['skills']} {data['education']} {data['certifications']} {data['job_role']}"
-    vector = tfidf.transform([clean_text(text)])
-    prediction = model.predict(vector)[0]
-    decision = le.inverse_transform([prediction])[0]
-    return jsonify({"decision": decision})
+    try:
+        data = request.json
+        text = f"{data['skills']} {data['education']} {data['certifications']} {data['job_role']}"
+        vector = tfidf.transform([clean_text(text)])
+        prediction = model.predict(vector)[0]
+        decision = le.inverse_transform([prediction])[0]
+        return jsonify({"decision": decision})
+    except NameError:
+        return jsonify({"error": "Model files not loaded properly"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/analyze_resume", methods=["POST"])
 def analyze_resume():
     try:
         resume_file = request.files.get('resume')
         job_desc = request.form.get('job_desc', '')
+        
+        if not resume_file:
+            return jsonify({"error": "No resume file uploaded"}), 400
+            
         resume_text = extract_text(resume_file)
+        if not resume_text:
+            return jsonify({"error": "Could not extract text from the resume"}), 400
+
+        # Technical keyword extraction with deduplication
+        job_desc_cleaned = clean_technical_text(job_desc)
+        resume_text_cleaned = clean_technical_text(resume_text)
         
-        resume_words = set(re.findall(r"\b\w+\b", resume_text.lower()))
-        job_words = set(re.findall(r"\b\w+\b", job_desc.lower()))
+        # 1. Identify which technical concepts are in the JD
+        found_canonical_skills = set()
+        for skill in TECHNICAL_SKILLS_LIST:
+            pattern = r'\b' + re.escape(skill) + r'\b'
+            if re.search(pattern, job_desc_cleaned):
+                canonical = TECHNICAL_SYNONYMS.get(skill.lower(), skill)
+                found_canonical_skills.add(canonical)
         
-        matched = sorted(list(job_words & resume_words))
-        missing = sorted(list(job_words - resume_words))
-        match_percent = len(matched) / len(job_words) * 100 if job_words else 0
+        # 2. Check resume for these canonical skills (checking all synonyms)
+        matched = []
+        missing = []
+        
+        # Reverse map for resume checking (Canonical -> list of all possible terms)
+        def get_all_variants(canonical_name):
+            variants = {canonical_name}
+            for syn, canon in TECHNICAL_SYNONYMS.items():
+                if canon == canonical_name:
+                    variants.add(syn)
+            return variants
+
+        for canonical in found_canonical_skills:
+            variants = get_all_variants(canonical)
+            is_found = False
+            for variant in variants:
+                pattern = r'\b' + re.escape(variant) + r'\b'
+                if re.search(pattern, resume_text_cleaned):
+                    is_found = True
+                    break
+            
+            if is_found:
+                matched.append(canonical)
+            else:
+                missing.append(canonical)
+        
+        matched = sorted(matched)
+        missing = sorted(missing)
+        
+        total_req = len(found_canonical_skills)
+        match_percent = (len(matched) / total_req * 100) if total_req > 0 else 0
 
         # UI Color Coding Logic
         if match_percent >= 80:
@@ -88,71 +177,40 @@ def analyze_resume():
         else:
             level, color = "Needs Improvement", "#dc2626"
 
-        # Categorize Gaps
-        tech_keywords = ['python', 'java', 'sql', 'react', 'aws', 'docker', 'ml', 'api', 'tensorflow', 'pytorch', 'html', 'css', 'javascript']
-        tool_keywords = ['react', 'aws', 'docker', 'kubernetes', 'git', 'github', 'tableau', 'excel', 'jira', 'salesforce', 'powerbi']
-        soft_keywords = ['communication', 'teamwork', 'leadership', 'problem', 'collaboration', 'adaptability', 'organized', 'creativity', 'time', 'reliable']
-
-        resource_map = {
-            'python': ['Coursera: Python for Everybody', 'Real Python', 'Codecademy Python'],
-            'java': ['Udemy: Java Programming Masterclass', 'Coursera: Java Programming and Software Engineering Fundamentals'],
-            'sql': ['Mode Analytics SQL Tutorial', 'Khan Academy SQL'],
-            'react': ['freeCodeCamp React', 'Scrimba Learn React'],
-            'aws': ['AWS Skill Builder', 'Coursera AWS Fundamentals'],
-            'docker': ['Docker Docs', 'Udemy Docker Mastery'],
-            'kubernetes': ['Kubernetes Basics by Google', 'Udemy Kubernetes Certified'],
-            'ml': ['Coursera Machine Learning by Andrew Ng', 'fast.ai Practical Deep Learning'],
-            'api': ['Postman API Fundamentals', 'Udemy REST API Design'],
-            'html': ['freeCodeCamp HTML Course', 'MDN Web Docs'],
-            'css': ['freeCodeCamp CSS Course', 'MDN Web Docs'],
-            'javascript': ['freeCodeCamp JavaScript Algorithms', 'Eloquent JavaScript'],
-            'tensorflow': ['TensorFlow Developer Certificate', 'Coursera TensorFlow in Practice'],
-            'pytorch': ['DeepLearning.AI PyTorch', 'Udemy PyTorch for Deep Learning'],
-            'github': ['GitHub Learning Lab', 'freeCodeCamp Git & GitHub'],
-            'tableau': ['Tableau Public Resources', 'Udemy Tableau Bootcamp'],
-            'excel': ['Excel Easy', 'Coursera Excel Skills for Business'],
-            'jira': ['Atlassian Jira Tutorials', 'Udemy Jira Essentials'],
-            'powerbi': ['Microsoft Learn Power BI', 'Udemy Power BI A-Z']
-        }
-
-        technical = [s for s in missing if s in tech_keywords]
-        tools = [s for s in missing if s in tool_keywords and s not in technical]
-        soft = [s for s in missing if s in soft_keywords]
-        other = [s for s in missing if s not in technical + tools + soft][:10]
-
-        resources = []
-        for keyword in missing:
-            if keyword in resource_map:
-                for resource in resource_map[keyword]:
-                    if resource not in resources:
-                        resources.append(resource)
-
         improvement_tips = []
-        if technical:
-            improvement_tips.append(f"Add technical keywords like {', '.join(technical[:5])} to your resume and support them with concrete project examples.")
-        if tools:
-            improvement_tips.append(f"Highlight tool experience with {', '.join(tools[:5])}, including hands-on projects or certifications.")
-        if soft:
-            improvement_tips.append(f"Showcase soft skills such as {', '.join(soft[:5])} through achievements and teamwork examples.")
-        if other:
-            improvement_tips.append(f"Include more role-specific keywords such as {', '.join(other[:5])} from the job description.")
-        if not missing:
-            improvement_tips.append("Your resume already matches the job description well. Keep the language specific and results-focused.")
+        if matched:
+            improvement_tips.append(f"Great! Your resume includes key technical terms like {', '.join(matched[:5])}.")
+        if missing:
+            improvement_tips.append(f"Consider adding technical keywords such as {', '.join(missing[:5])} to better match the job description.")
+        
+        if not found_canonical_skills:
+            improvement_tips.append("No specific technical skills were identified from the job description. Try adding more technical requirements.")
+
+        learning_resources = []
+        if missing:
+            learning_resources = [
+                {"platform": "Coursera", "url": "https://www.coursera.org", "description": "University-backed certifications and specialized courses."},
+                {"platform": "Udemy", "url": "https://www.udemy.com", "description": "Hands-on projects and practical skill-building tutorials."},
+                {"platform": "Documentation & Labs", "url": "https://docs.microsoft.com", "description": "Free interactive learning paths and technical documentation."},
+                {"platform": "LinkedIn Learning", "url": "https://www.linkedin.com/learning", "description": "Professional courses to boost your technical and soft skills."}
+            ]
 
         return jsonify({
             "match_percent": round(match_percent, 2),
             "match_level": level,
             "level_color": color,
-            "matched_skills": matched[:15],
+            "matched_skills": matched,
             "total_matched": len(matched),
-            "total_required": len(job_words),
-            "missing_categories": {"technical": technical, "tools": tools, "soft_skills": soft, "other": other},
+            "total_required": total_req,
+            "missing_categories": {"technical": missing},
             "total_missing": len(missing),
-            "recommendation": "Tailor your resume by adding the missing keywords found below.",
+            "recommendation": "Focus on incorporating the key technical terms from the job description into your resume.",
             "improvement_tips": improvement_tips,
-            "learning_resources": resources[:8]
+            "learning_resources": learning_resources
         })
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route("/train_and_candidates", methods=["POST"])
@@ -164,6 +222,12 @@ def train_and_candidates():
 
         # Read CSV data
         df = pd.read_csv(csv_file)
+
+        # Check required columns
+        required_columns = ['Skills', 'Education', 'Certifications', 'Job Role', 'Recruiter Decision']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return jsonify({"error": f"Missing required columns: {', '.join(missing_columns)}"}), 400
 
         # Prepare training data
         features = []

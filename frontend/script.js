@@ -21,7 +21,29 @@ if (numSlider) {
   });
 }
 
+/**
+ * Single Prediction Logic (Manual Input)
+ */
+async function predict(){
+  const skills = document.getElementById("skills").value;
+  const education = document.getElementById("education").value;
+  const certifications = document.getElementById("certifications").value;
+  const job_role = document.getElementById("job_role").value;
 
+  const response = await fetch("http://127.0.0.1:5000/predict",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({
+      skills:skills,
+      education:education,
+      certifications:certifications,
+      job_role:job_role
+    })
+  });
+
+  const data = await response.json();
+  document.getElementById("result").innerHTML = "<h3>Decision: " + data.decision + "</h3>";
+}
 
 /**
  * Bulk Candidate Screening (CSV Upload)
@@ -214,10 +236,11 @@ async function analyzeResume() {
     
     // BUILD THE RESULTS UI
     let html = `
-    <div style="background:white; border-radius:16px; padding:40px; margin-bottom:32px; border:1px solid #e8e0d4; box-shadow: 0 2px 20px rgba(26,22,18,0.07);">
+    <div style="background:white; border-radius:16px; padding:40px; margin-bottom:32px; border:1px solid #e8e0d4; box-shadow: var(--shadow-lg); transition: all 0.3s ease;">
       <div style="display:flex; align-items:center; justify-content:center; gap:48px; flex-wrap:wrap;">
         <div style="flex:0 0 auto;">
-          <div style="width:200px; height:200px; border-radius:50%; background:${data.level_color}15; border:4px solid ${data.level_color}; display:flex; align-items:center; justify-content:center;">
+          <div style="width:200px; height:200px; border-radius:50%; background: linear-gradient(135deg, ${data.level_color}10 0%, ${data.level_color}25 100%); border: 8px solid ${data.level_color}20; display:flex; align-items:center; justify-content:center; position: relative;">
+            <div style="position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 4px solid ${data.level_color}; border-top-color: transparent; border-right-color: transparent; transform: rotate(45deg);"></div>
             <div style="text-align:center;">
               <div style="font-size:54px; font-weight:900; color:${data.level_color}; line-height:1;">${data.match_percent}%</div>
               <div style="font-size:11px; color:${data.level_color}; font-weight:700; text-transform:uppercase; letter-spacing:2px; margin-top:8px;">Match Score</div>
@@ -225,10 +248,13 @@ async function analyzeResume() {
           </div>
         </div>
         <div style="flex:1; min-width:300px;">
-          <h3 style="font-size:26px; font-weight:700; color:${data.level_color}; margin:0 0 8px 0;">${data.match_level}</h3>
-          <p style="color:#9d958c; font-size:13px; margin:0 0 20px 0;">${data.total_matched} of ${data.total_required} keywords identified</p>
-          <div style="background:#fdf9f4; border-left:4px solid ${data.level_color}; padding:16px; border-radius:8px;">
-            <p style="color:#4a4540; line-height:1.6; font-size:14px; margin:0;">${data.recommendation}</p>
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+            <h3 style="font-size:28px; font-weight:800; color:${data.level_color}; margin:0;">${data.match_level}</h3>
+            <span style="background:${data.level_color}20; color:${data.level_color}; padding:4px 12px; border-radius:99px; font-size:12px; font-weight:700;">AI AUDIT</span>
+          </div>
+          <p style="color:#9d958c; font-size:14px; margin:0 0 20px 0;">We found <strong>${data.total_matched}</strong> technical matches out of <strong>${data.total_required}</strong> required skills identified in the job description.</p>
+          <div style="background:#fdf9f4; border-left:4px solid ${data.level_color}; padding:20px; border-radius:12px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+            <p style="color:#4a4540; line-height:1.6; font-size:15px; margin:0;">${data.recommendation}</p>
           </div>
         </div>
       </div>
@@ -278,9 +304,19 @@ async function analyzeResume() {
     if (data.learning_resources && data.learning_resources.length > 0) {
       html += `
       <div style="background:white; border-radius:12px; padding:25px; border:1px solid #e8e0d4; margin-bottom:24px;">
-        <h4 style="font-size:15px; font-weight:600; color:#059669; margin-bottom:15px;">📚 Recommended Learning Resources</h4>
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
-          ${data.learning_resources.map(resource => `<div style="background:#f0f9f8; border-radius:12px; padding:14px; border:1px solid #d1fae5; font-size:13px; color:#064e3b;">${resource}</div>`).join('')}
+        <h4 style="font-size:15px; font-weight:600; color:#059669; margin-bottom:15px;">📚 Where to Learn Missing Skills</h4>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
+          ${data.learning_resources.map(res => `
+            <a href="${res.url}" target="_blank" style="text-decoration:none; color:inherit; display:block;">
+              <div style="background:#f0f9f8; border-radius:12px; padding:16px; border:1px solid #d1fae5; transition: all 0.2s ease; cursor:pointer;" onmouseover="this.style.borderColor='#059669'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#d1fae5'; this.style.transform='translateY(0)'">
+                <div style="font-weight:700; color:#065f46; margin-bottom:4px; display:flex; align-items:center; gap:8px;">
+                  <span>${res.platform}</span>
+                  <span style="font-size:10px; background:#d1fae5; padding:2px 6px; border-radius:4px; font-weight:600;">VISIT ↗</span>
+                </div>
+                <div style="font-size:12px; color:#064e3b; line-height:1.4;">${res.description}</div>
+              </div>
+            </a>
+          `).join('')}
         </div>
       </div>`;
     }
